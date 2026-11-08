@@ -42,6 +42,4 @@ jobs:
       - name: Run Ascend hardware tests
         env:
           TORCH_PRISMA_TEST_DEVICE: ascend
-        run: |
-          export PYTHONPATH="${GITHUB_WORKSPACE}/src${PYTHONPATH:+:$PYTHONPATH}"
-          python3 -m pytest -m ascend
+        run: python3 -m pytest -m ascend

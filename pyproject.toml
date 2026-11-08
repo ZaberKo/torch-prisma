@@ -32,6 +32,7 @@ dev = [
 ]
 
 [tool.uv.build-backend]
+module-root = ""
 source-include = ["docs/**", "tests/**"]
 
 [tool.pytest.ini_options]

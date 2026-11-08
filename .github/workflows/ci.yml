@@ -46,7 +46,7 @@ jobs:
           uvx --python 3.12 twine check --strict dist/*.whl dist/*.tar.gz
           uv pip install --reinstall --no-deps dist/*.whl
       - name: Test
-        run: .venv/bin/python -m pytest
+        run: .venv/bin/python -I -m pytest
       - uses: actions/upload-artifact@v7
         if: matrix.python == '3.12'
         with:
