@@ -1280,11 +1280,11 @@ requires-dist = [{ name = "torch", specifier = ">=2.6" }]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "pre-commit", marker = "python_full_version >= '3.11'", specifier = ">=4.7,<5" },
+    { name = "pre-commit", marker = "python_full_version >= '3.11'" },
     { name = "pytest", specifier = ">=8" },
-    { name = "ruff", specifier = ">=0.17.4,<0.18" },
+    { name = "ruff" },
 ]
-docs = [{ name = "zensical", marker = "python_full_version >= '3.11'", specifier = ">=0.1,<0.2" }]
+docs = [{ name = "zensical", marker = "python_full_version >= '3.11'" }]
 
 [[package]]
 name = "triton"
