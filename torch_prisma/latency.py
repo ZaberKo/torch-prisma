@@ -11,7 +11,7 @@ from typing import Any
 
 import torch
 
-from ._execution import accelerator_runtime, prepare_forward
+from .execution import accelerator_runtime, prepare_forward
 
 
 @dataclass(frozen=True)

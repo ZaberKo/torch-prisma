@@ -12,8 +12,8 @@ from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.profiler import ProfilerActivity, profile, record_function
 from torch.utils.flop_counter import FlopCounterMode, flop_registry
 
-from ._execution import prepare_forward, tensor_leaves
-from ._formulas import (
+from .execution import prepare_forward, tensor_leaves
+from .formulas import (
     FLOP_COMPOSITES,
     FLOP_FREE_OPS,
     MAC_COMPOSITES,
