@@ -1,25 +1,17 @@
 # Development and releases
 
-## Local development
+[Local development](https://github.com/ZaberKo/torch-prisma/blob/main/README.md#development)
 
-The README explains environment setup, tests, and local builds. [Development](https://github.com/ZaberKo/torch-prisma/blob/main/README.md#development)
+## Accelerator validation
+
+Run the **Accelerator validation** workflow with `cuda` or `ascend` on a configured self-hosted runner. The Ascend runner must have CANN initialized and TorchNPU, TorchAir, and pytest available to `python3`.
 
 ## Read the Docs
 
-1. Push the documentation configuration to the branch Read the Docs will build.
-2. Connect your GitHub account in Read the Docs. If you use the GitHub App, grant it access to the repository.
-3. Select **Add project**, choose `ZaberKo/torch-prisma`, and set the default branch to `main`. Read the Docs reads `.readthedocs.yaml` from the repository root.
-4. Open **Builds** and check the first build of `latest`. Once the project URL is assigned, set `site_url` in `zensical.toml` to its canonical documentation URL.
+Connect GitHub to Read the Docs, add `ZaberKo/torch-prisma`, and select `main` as the default branch. The repository's `.readthedocs.yaml` builds the Zensical site. Set `site_url` in `zensical.toml` once the canonical URL is assigned. [Add a project](https://docs.readthedocs.com/platform/latest/intro/add-project.html)
 
-The build configuration uses Python 3.12, installs uv, and builds the site from the locked `docs` dependency group. It copies the generated HTML into the Read the Docs output directory.
+## Publishing
 
-Importing a private repository requires Read the Docs Business. Read the Docs Community supports public repositories. [Project setup](https://docs.readthedocs.com/platform/latest/intro/add-project.html) · [Private repositories](https://docs.readthedocs.com/platform/latest/guides/creating-project-private-repository.html) · [Zensical deployment](https://docs.readthedocs.com/platform/latest/intro/zensical.html)
-
-## Publishing version 0.1.0
-
-1. Configure the repository's `pypi` GitHub Actions environment.
-2. Register a pending Trusted Publisher on PyPI for the `torch-prisma` project. Set the GitHub owner and repository to the release repository, the workflow filename to `publish.yml`, and the environment to `pypi`. [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/)
-3. Confirm that the release commit passes CI. Publish a GitHub release tagged `v0.1.0` at that commit.
-4. Check the publish workflow. It verifies the tag against `pyproject.toml`, reruns CI, publishes the checked distributions through PyPI Trusted Publishing, and attaches the same files to the GitHub release.
-
-For subsequent releases, update the version in `pyproject.toml`, refresh `uv.lock`, and use the matching tag.
+1. Configure the GitHub Actions environment `pypi` and register a Trusted Publisher for the `torch-prisma` PyPI project. Use repository `ZaberKo/torch-prisma`, workflow `publish.yml`, and environment `pypi`. [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/)
+2. Update the package version and `uv.lock` as needed. Confirm that CI passes on the release commit.
+3. Publish a GitHub release with the matching tag, such as `v0.1.0`. The workflow publishes the checked distributions to PyPI and attaches them to the GitHub release.

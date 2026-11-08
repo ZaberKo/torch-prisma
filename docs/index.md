@@ -1,10 +1,10 @@
 # Torch Prisma
 
-Torch Prisma measures inference latency and model complexity for PyTorch models on CPU, CUDA, and Huawei Ascend. It reports latency samples and summary statistics alongside parameters, multiply-accumulates (MACs), floating-point operations (FLOPs), and counting coverage.
+Torch Prisma measures PyTorch inference latency, parameters, multiply-accumulates (MACs), and floating-point operations (FLOPs) on CPU, CUDA, and Huawei Ascend.
 
 ## Installation
 
-Torch Prisma requires Python 3.10 or later and PyTorch 2.6 or later. Create a virtual environment with `uv venv` if needed, then install a published release.
+Requires Python 3.10+ and PyTorch 2.6+. Install in a virtual environment.
 
 ```bash
 uv pip install torch-prisma
@@ -12,7 +12,7 @@ uv pip install torch-prisma
 
 ## Usage
 
-Measure a model with a representative input batch. Latency uses `torch.compile` by default. Pass `compile=False` for eager timing.
+Latency uses `torch.compile` by default. Set `compile=False` for eager timing.
 
 ```python
 import torch
@@ -34,5 +34,6 @@ print(latency.median_ms)
 ## Guides
 
 - [Measurement API and conventions](measurement.md)
+- [Latency benchmarks](benchmarks.md)
 - [Huawei Ascend and TorchAir](ascend.md)
 - [Development and releases](release.md)

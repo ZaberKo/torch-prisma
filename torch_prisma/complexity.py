@@ -34,11 +34,9 @@ _FORMULA_PREFIX = "torch_prisma.formula/"
 
 
 def count_parameters(model: nn.Module) -> int:
-    """Count elements in unique registered Parameters without executing the model.
+    """Count elements in the model's unique registered parameters.
 
-    Tensor dimensions determine the count for all registered Parameters,
-    including frozen, unused, and masked weights. Parameter identity
-    deduplicates multiple registrations of the same tensor object.
+    Counts use tensor dimensions, including for frozen or masked parameters.
 
     Args:
         model: Module whose registered parameters are counted.
@@ -60,24 +58,14 @@ class OperationCounts:
 
 @dataclass(frozen=True)
 class ModelComplexity:
-    """Recorded FLOPs, dense MACs and unique registered parameter elements.
-
-    Operation counts describe the known subtotal for the supplied batch and
-    executed path under the documented counting conventions. One real
-    floating-point dense MAC contributes two FLOPs. Supported bias,
-    normalization and elementwise arithmetic contribute only to FLOPs.
-
-    For each convention, `uncovered_ops` lists observed operations for which
-    the counter cannot establish a complete count.
+    """Model parameter count and operation counts for one forward.
 
     Attributes:
-        macs: Count of audited matrix and convolution multiply-accumulates.
-        params: Count of unique registered Parameter elements.
-        flops: Known nominal floating-point arithmetic under the registered formulas.
-        uncovered_ops: Dictionary with `macs` and `flops` keys. Each value is a
-            sorted tuple of unique operator names. Names can occur under both
-            keys. The dictionary is mutable, although the record fields are
-            frozen and the tuples are immutable.
+        macs: Known dense matrix and convolution multiply-accumulates.
+        params: Number of elements in unique registered parameters.
+        flops: Known nominal floating-point operations.
+        uncovered_ops: Sorted names of operations with incomplete counts,
+            grouped under `macs` and `flops`.
     """
 
     macs: int

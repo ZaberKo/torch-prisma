@@ -5,6 +5,7 @@ repo_url = "https://github.com/ZaberKo/torch-prisma"
 nav = [
     { "Home" = "index.md" },
     { "Measurement API" = "measurement.md" },
+    { "Latency benchmarks" = "benchmarks.md" },
     { "Huawei Ascend" = "ascend.md" },
     { "Development and releases" = "release.md" },
 ]

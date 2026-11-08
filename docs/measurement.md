@@ -4,17 +4,17 @@ Import `measure_module_latency`, `calculate_model_complexity`, `count_operations
 
 ## Inputs and execution
 
-Set the model's train or eval mode and place the model and inputs on their execution devices before measuring. Both APIs run the supplied model or callable with the supplied inputs. Forward calls can change parameters, buffers, and inputs. Pass a separate model instance or input copies when you need to preserve the originals.
+Set the model mode and place the model and inputs on their execution devices before measuring. Forward side effects persist. Pass a separate model instance or copies of the inputs to preserve the originals.
 
-A tuple or list in `input_args` supplies positional arguments. Any other value supplies one positional argument. Use `()` for a keyword-only forward and `(items,)` to pass a list as one argument. Use `input_kwargs` for keyword arguments.
+A tuple or list in `input_args` supplies positional arguments. Other values supply one positional argument. Use `(items,)` to pass a list as one argument, or `()` with `input_kwargs` for a keyword-only forward.
 
 ## Latency
 
 `measure_module_latency(target, input_args, device, input_kwargs=None, *, repetitions=20, warmup=5, compile=True, compile_kwargs=None)` returns a `LatencyStats` dataclass.
 
-Each sample is the duration of one forward for the supplied batch. The required `device` selects the timing device. CPU timing uses `time.perf_counter()`. CUDA and Ascend timing use device events on the current stream and synchronize the selected device around the measurement loop. Include any required stream dependencies in the callable.
+Each sample measures one forward in inference mode for the entire batch. CPU uses a wall clock. CUDA and Ascend use events on the current stream of the selected device. The callable must handle any dependencies on other streams.
 
-Latency measurement uses `torch.compile` by default. Compilation preparation runs three untimed forwards with temporarily raised Dynamo recompilation limits. Warmup and sampling run afterward with the original limits. If either phase requires compilation, the measurement raises an error because the compiled latency would be unreliable. Use `compile=False` to measure eager latency. Preparation and warmup can change model and input state before sampling starts. `compile_kwargs` is forwarded to `torch.compile`. The default backend on Ascend is TorchAir. See [Ascend setup](ascend.md).
+Compilation runs three untimed forwards before warmup and raises an error if further compilation is required during warmup or sampling. Set `compile=False` for eager timing. Use `compile_kwargs` to configure `torch.compile`. [Ascend backend setup](ascend.md)
 
 | Field | Definition |
 | --- | --- |
@@ -24,13 +24,11 @@ Latency measurement uses `torch.compile` by default. Compilation preparation run
 | `p90_ms`, `p99_ms` | Samples at index `min(int(n * q), n - 1)` in sorted order for `q = 0.90` or `0.99` |
 | `min_ms`, `max_ms` | Minimum and maximum |
 
-All values use milliseconds. `LatencyStats.from_samples(samples_ms)` summarizes timings from any source under the same convention. `to_dict()` returns a JSON-ready representation.
-
-When comparing two measurements, hold the batch size, shape, dtype, device, thread count, compilation options, warmup, and repetition count fixed. Keep the samples when reporting tail percentiles.
+Durations are in milliseconds. Use `LatencyStats.from_samples()` to summarize external timings and `to_dict()` to serialize the result. [Benchmark protocol and results](benchmarks.md)
 
 ## Complexity
 
-`calculate_model_complexity(target, input_args, input_kwargs=None)` returns a `ModelComplexity` dataclass for one eager forward. Run it separately from latency measurement. It disables gradients and the MHA fast path and requests math scaled dot-product attention during counting.
+`calculate_model_complexity(target, input_args, input_kwargs=None)` returns a `ModelComplexity` record for one eager forward without gradients. Counting requests math scaled dot-product attention and disables the multihead attention fast path.
 
 | Field | Definition |
 | --- | --- |
@@ -39,21 +37,21 @@ When comparing two measurements, hold the batch size, shape, dtype, device, thre
 | `flops` | Known nominal floating-point arithmetic on the executed path |
 | `uncovered_ops` | Sorted operator names with incomplete counts, grouped under `macs` and `flops` |
 
-`count_parameters(model)` reports the registered parameter count without a forward. It deduplicates by parameter identity and excludes buffers. Distinct parameters with shared storage count separately. Registered tensor dimensions determine the count for masked or zero-valued weights. For a plain callable, `params` defaults to zero. `ModelComplexity.to_dict()` returns JSON-ready counts and coverage.
+`count_parameters(model)` counts unique parameter objects without executing a forward. Counts use registered tensor dimensions. Distinct parameters that share storage count separately. A plain callable reports zero parameters.
 
-The counter attributes two nominal FLOPs to each real floating-point dense MAC. Supported bias, elementwise, reduction, and normalization arithmetic adds FLOPs independently. Comparisons, ReLU, forward max pooling, indexing, and data movement contribute zero FLOPs under this convention. Integer matrix work contributes logical MACs and zero FLOPs. Complex matrix work contributes logical MACs and a FLOP coverage gap. Masking and kernel fusion leave the declared dense MAC convention unchanged.
+Each real floating-point dense MAC contributes two FLOPs. Supported arithmetic outside the matrix products adds to FLOPs. Comparisons, ReLU, forward max pooling, indexing, and data movement contribute zero FLOPs. Integer matrix work contributes MACs only. Complex matrix work contributes MACs and a FLOP coverage gap.
 
-The totals are known subtotals for the full batch. For example, GELU can appear under `uncovered_ops["flops"]` while leaving MAC coverage complete. A fused attention kernel can contribute its matrix products while retaining a FLOP diagnostic for its other arithmetic. Coverage depends on the operations visible to the dispatcher and profiler. An empty coverage list describes the observed trace. Opaque work can remain invisible to both instruments. Use latency to compare hardware execution time.
+MACs and FLOPs are subtotals for the supplied batch. Check `uncovered_ops` for visible operations with incomplete counts. Opaque kernels can conceal operations from the counter.
 
 ### Nominal FLOP formulas
 
-The following formulas cover common operations. Each transcendental operation counts as one nominal unit.
+Each transcendental operation counts as one FLOP under this convention.
 
 | Operation | FLOP convention |
 | --- | --- |
 | Addition, subtraction, multiplication, and division | One per output element. Add a multiplication when an add or subtract applies a nonunit scale. |
 | Sum and mean over a group of `K` elements | `K - 1` additions for a nonempty group, plus one division for mean. |
-| Softmax over a group of `K` elements | `4K - 1` operations for a nonempty group. The count includes subtraction, exponentiation, summation, and division. |
+| Softmax over a group of `K` elements | `4K - 1` operations for a nonempty group. |
 | LayerNorm and GroupNorm | `5K + 2` operations per group of `K` elements, with another `K` for each affine weight or bias. |
 | BatchNorm with stored statistics | Two operations per channel and two per input element, with another operation per element for each affine weight or bias. |
 | Bias and scaling in a matrix product | An addition per output element when the bias term is active, plus each applicable nonunit scalar multiplication. |
@@ -61,7 +59,7 @@ The following formulas cover common operations. Each transcendental operation co
 
 ### Prepared forwards
 
-`count_operations(forward)` runs a zero-argument eager callable and returns an `OperationCounts` dataclass with `macs`, `flops`, and `uncovered_ops`. Prepare the model and inputs before calling it. Code that measures a sampled network can use this function and compute its active parameter count separately.
+`count_operations(forward)` returns `OperationCounts` for a zero-argument eager callable. Use it when parameter counting is handled separately.
 
 ```python
 from torch_prisma import count_operations
