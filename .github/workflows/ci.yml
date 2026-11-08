@@ -36,7 +36,7 @@ jobs:
           TEST_TORCH: ${{ matrix.torch }}
         run: |
           uv venv --python "$(command -v python)"
-          uv pip install --torch-backend=cpu --group dev -e . "torch==$TEST_TORCH+cpu"
+          uv pip install --torch-backend=cpu --group dev -e . "torch~=$TEST_TORCH"
       - name: Run pre-commit hooks
         if: matrix.python == '3.12'
         run: .venv/bin/pre-commit run --all-files --show-diff-on-failure

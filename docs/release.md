@@ -2,7 +2,7 @@
 
 ## Local development
 
-Install uv and run the following commands from the repository root. Use the repository's Python 3.12 environment for development tools. Pre-commit 4.7 requires Python 3.11 or later.
+Install uv and run the following commands from the repository root. Use the repository's Python 3.12 environment for development tools. Zensical and pre-commit 4.7 require Python 3.11 or later.
 
 ```bash
 uv sync --locked
@@ -21,7 +21,7 @@ uv pip install --torch-backend=cpu --group dev -e .
 .venv/bin/python -m pytest
 ```
 
-The hooks run Ruff linting and formatting and check common repository file formats and whitespace. Ruff enforces Google-style docstrings in the library. Review and stage any automatic fixes before committing. When updating Ruff, update its development dependency and hook revision together.
+The hooks run Ruff linting and formatting and check common repository file formats and whitespace. Ruff enforces Google-style docstrings in the library. Review and stage any automatic fixes before committing. Declare compatible dependency ranges in `pyproject.toml` and use `uv.lock` for reproducible environments. When updating Ruff, update its development dependency and hook revision together.
 
 The regular GitHub Actions workflow runs the same hooks and the CPU test matrix and validates the wheel and source distribution. Accelerator validation runs on demand on a matching self-hosted runner. See [Ascend setup](ascend.md) for runner requirements.
 

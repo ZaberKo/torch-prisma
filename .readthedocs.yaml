@@ -6,7 +6,7 @@ build:
     python: "3.12"
   jobs:
     install:
-      - python -m pip install uv==0.9.11
+      - python -m pip install 'uv>=0.9.11,<0.10'
     build:
       html:
         - uv run --locked --isolated --only-group docs --python "$(command -v python)" zensical build --strict

@@ -26,11 +26,11 @@ Issues = "https://github.com/ZaberKo/torch-prisma/issues"
 
 [dependency-groups]
 dev = [
-    "pre-commit==4.7.0; python_version >= '3.11'",
+    "pre-commit>=4.7,<5; python_version >= '3.11'",
     "pytest>=8",
-    "ruff==0.17.4",
+    "ruff>=0.17.4,<0.18",
 ]
-docs = ["zensical==0.1.0"]
+docs = ["zensical>=0.1,<0.2"]
 
 [tool.uv.dependency-groups]
 docs = { requires-python = ">=3.11" }
