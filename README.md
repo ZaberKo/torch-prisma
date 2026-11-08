@@ -23,6 +23,12 @@ print(complexity.uncovered_ops)
 print(latency.median_ms, latency.p90_ms)
 ```
 
-Requires Python 3.10 or later and PyTorch 2.6 or later. The [measurement guide](https://github.com/ZaberKo/torch-prisma/blob/main/docs/measurement.md) covers input preparation, counting conventions, and the API. See [Ascend setup](https://github.com/ZaberKo/torch-prisma/blob/main/docs/ascend.md) for CANN, `torch_npu`, and TorchAir, and the [release guide](https://github.com/ZaberKo/torch-prisma/blob/main/docs/release.md) for development and publishing.
+Requires Python 3.10 or later and PyTorch 2.6 or later. The [measurement guide](https://github.com/ZaberKo/torch-prisma/blob/main/docs/measurement.md) covers input preparation, counting conventions, and the API. See [Ascend setup](https://github.com/ZaberKo/torch-prisma/blob/main/docs/ascend.md) for CANN, `torch_npu`, and TorchAir, and the [release guide](https://github.com/ZaberKo/torch-prisma/blob/main/docs/release.md) for publishing.
 
-The operation formulas and coverage analysis are adapted from [torch-kirigami](https://github.com/ZaberKo/torch-kirigami). Distributed under the [MIT License](https://github.com/ZaberKo/torch-prisma/blob/main/LICENSE).
+## Development
+
+See the [development guide](https://github.com/ZaberKo/torch-prisma/blob/main/DEV.md) for setup, tests, and builds.
+
+## License
+
+Torch Prisma is distributed under the [MIT License](https://github.com/ZaberKo/torch-prisma/blob/main/LICENSE).

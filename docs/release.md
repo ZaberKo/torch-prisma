@@ -2,41 +2,9 @@
 
 ## Local development
 
-Install uv and run the following commands from the repository root. Use the repository's Python 3.12 environment for development tools. Zensical and pre-commit 4.7 require Python 3.11 or later.
+See the repository's [development guide](https://github.com/ZaberKo/torch-prisma/blob/main/DEV.md) for environment setup, tests, and local builds.
 
-```bash
-uv sync --locked
-uv run --locked pre-commit install --install-hooks
-uv run --locked pre-commit run --all-files
-uv run --locked pytest
-uv build
-uvx twine check --strict dist/*
-```
-
-For a CPU-only test environment, select the PyTorch CPU index explicitly.
-
-```bash
-uv venv --python 3.12
-uv pip install --torch-backend=cpu --group dev -e .
-.venv/bin/python -m pytest
-```
-
-The hooks run Ruff linting and formatting and check common repository file formats and whitespace. Ruff enforces Google-style docstrings in the library. Review and stage any automatic fixes before committing. Declare compatible dependency ranges in `pyproject.toml` and use `uv.lock` for reproducible environments. When updating Ruff, update its development dependency and hook revision together.
-
-The regular GitHub Actions workflow runs the same hooks and the CPU test matrix and validates the wheel and source distribution. Accelerator validation runs on demand on a matching self-hosted runner. See [Ascend setup](ascend.md) for runner requirements.
-
-## Documentation
-
-The documentation site uses Zensical and the Markdown pages in `docs/`. Run these commands from the repository root to preview the site or build it with strict link validation.
-
-```bash
-uv run --locked --isolated --only-group docs zensical serve
-uv run --locked --isolated --only-group docs zensical build --strict
-```
-
-Both commands use the locked documentation dependencies in an isolated environment. The build writes HTML to `site/`. GitHub CI runs the strict build.
-
-### Read the Docs
+## Read the Docs
 
 1. Push the documentation configuration to the branch Read the Docs will build.
 2. Connect your GitHub account in Read the Docs. If you use the GitHub App, grant it access to the repository.
