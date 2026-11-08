@@ -1,6 +1,7 @@
 import os
 import sys
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 import torch
@@ -57,19 +58,26 @@ def test_ascend_compiler_and_event_wiring(monkeypatch):
         )
         return x
 
-    monkeypatch.setitem(
-        sys.modules, "torchair", SimpleNamespace(get_npu_backend=lambda: "torchair-test")
-    )
+    backend_factory = Mock(return_value="torchair-test")
+    monkeypatch.setitem(sys.modules, "torchair", SimpleNamespace(get_npu_backend=backend_factory))
     monkeypatch.setattr(latency, "_timing_device", timing_device)
     monkeypatch.setattr(torch, "compile", compile_fn)
-    result = measure_module_latency(
-        forward,
-        torch.ones(1),
-        "npu:0",
-        repetitions=2,
-        warmup=1,
-        compile_kwargs={"fullgraph": True},
-    )
+    latency._default_npu_backend.cache_clear()
+    try:
+        assert latency._compile_options(device, {"backend": "custom"}) == {"backend": "custom"}
+        backend_factory.assert_not_called()
+        result = measure_module_latency(
+            forward,
+            torch.ones(1),
+            "npu:0",
+            repetitions=2,
+            warmup=1,
+            compile_kwargs={"fullgraph": True},
+        )
+        assert latency._compile_options(device, None) == {"backend": "torchair-test"}
+        backend_factory.assert_called_once_with()
+    finally:
+        latency._default_npu_backend.cache_clear()
     assert result.samples_ms == (0.25, 0.25)
     assert operations == (
         ["forward", "forward", "forward", "sync", "forward"]

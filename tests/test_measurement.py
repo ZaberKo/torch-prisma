@@ -80,7 +80,13 @@ def test_measurement_uses_the_supplied_model_mode_and_inputs(measure):
     model = Model()
     x = torch.ones(1)
     options = (
-        {"device": "cpu", "repetitions": 1, "warmup": 0, "compile": False}
+        {
+            "device": "cpu",
+            "repetitions": 1,
+            "warmup": 0,
+            "compile": False,
+            "compile_kwargs": {"backend": "eager"},
+        }
         if measure is measure_module_latency
         else {}
     )
@@ -115,9 +121,7 @@ def test_invalid_samples(samples):
         LatencyStats.from_samples(samples)
 
 
-@pytest.mark.parametrize(
-    "settings", [{"repetitions": 0}, {"warmup": -1}, {"compile": False, "compile_kwargs": {}}]
-)
+@pytest.mark.parametrize("settings", [{"repetitions": 0}, {"warmup": -1}])
 def test_invalid_timing_options(settings):
     with pytest.raises(ValueError):
         measure_module_latency(nn.Identity(), torch.ones(1), "cpu", **settings)

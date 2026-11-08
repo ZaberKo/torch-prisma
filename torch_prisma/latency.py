@@ -1,5 +1,6 @@
 """Eager and compiled inference latency on CPU, CUDA and Ascend."""
 
+import functools
 import gc
 import math
 import statistics
@@ -124,19 +125,25 @@ def _fail_on_late_compile() -> Iterator[None]:
             ) from error
 
 
+@functools.cache
+def _default_npu_backend() -> Callable[..., Any]:
+    """Load and reuse the default TorchAir backend."""
+    try:
+        torchair = import_module("torchair")
+    except ModuleNotFoundError as error:
+        if error.name != "torchair":
+            raise
+        raise RuntimeError(
+            "Compiled Ascend latency requires a compatible TorchAir installation"
+        ) from error
+    return torchair.get_npu_backend()
+
+
 def _compile_options(device: torch.device, options: dict[str, Any] | None) -> dict[str, Any]:
     """Select TorchAir for Ascend unless the caller supplied a backend."""
     options = dict(options or {})
     if device.type == "npu" and "backend" not in options:
-        try:
-            torchair = import_module("torchair")
-        except ModuleNotFoundError as error:
-            if error.name != "torchair":
-                raise
-            raise RuntimeError(
-                "Compiled Ascend latency requires a compatible TorchAir installation"
-            ) from error
-        options["backend"] = torchair.get_npu_backend()
+        options["backend"] = _default_npu_backend()
     return options
 
 
@@ -151,12 +158,11 @@ def measure_module_latency(
     compile: bool = True,
     compile_kwargs: dict[str, Any] | None = None,
 ) -> LatencyStats:
-    """Measure one forward per sample for the entire supplied batch.
+    """Measure the latency of one forward per sample for the supplied batch.
 
-    Prepare the model mode and device placement before calling this function.
-    Compilation preparation, warmup, and sampling all run the forward.
-    Changes made by those calls persist. Pass a separate model instance to
-    preserve the original model state.
+    Set the model mode and place the model and inputs before calling.
+    Forward calls run in inference mode, and their side effects persist.
+    Timing starts after compilation preparation and warmup.
 
     Args:
         target: A prepared module or callable.
@@ -165,12 +171,14 @@ def measure_module_latency(
         input_kwargs: Optional keyword arguments.
         repetitions: Positive number of timed forwards.
         warmup: Number of untimed forwards after any compilation preparation.
-        compile: Use `torch.compile` and run three preparation forwards.
-            Pass `False` for eager timing. Ascend selects TorchAir.
-        compile_kwargs: Options forwarded to `torch.compile`, including `backend`.
+        compile: Enable `torch.compile` and three untimed preparation forwards.
+            Ascend defaults to TorchAir. Set `False` for eager timing if
+            TorchAir reports a compatibility error.
+        compile_kwargs: Keyword arguments forwarded to `torch.compile` when
+            compilation is enabled.
 
     Returns:
-        Timed forward durations and summary statistics in milliseconds.
+        Forward durations in sampling order and their summary statistics in milliseconds.
 
     Raises:
         ValueError: The timing options or timing device are invalid.
@@ -179,8 +187,8 @@ def measure_module_latency(
     """
     if type(repetitions) is not int or repetitions <= 0 or type(warmup) is not int or warmup < 0:
         raise ValueError("Require positive repetitions and nonnegative warmup")
-    if type(compile) is not bool or (compile_kwargs is not None and not compile):
-        raise ValueError("compile must be a boolean and compile_kwargs requires compile=True")
+    if type(compile) is not bool:
+        raise ValueError("compile must be a boolean")
 
     args, kwargs = call_arguments(input_args, input_kwargs)
     device, runtime = _timing_device(device)
