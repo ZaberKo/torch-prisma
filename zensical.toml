@@ -1,0 +1,13 @@
+[project]
+site_name = "Torch Prisma"
+site_description = "Measure PyTorch inference latency, MACs, FLOPs, and parameters."
+repo_url = "https://github.com/ZaberKo/torch-prisma"
+nav = [
+    { "Home" = "index.md" },
+    { "Measurement API" = "measurement.md" },
+    { "Huawei Ascend" = "ascend.md" },
+    { "Development and releases" = "release.md" },
+]
+
+[project.theme]
+features = ["content.code.copy"]

@@ -40,6 +40,9 @@ jobs:
       - name: Run pre-commit hooks
         if: matrix.python == '3.12'
         run: .venv/bin/pre-commit run --all-files --show-diff-on-failure
+      - name: Build documentation
+        if: matrix.python == '3.12'
+        run: uv run --locked --isolated --only-group docs zensical build --strict
       - name: Check and install distributions
         if: matrix.python == '3.12'
         run: |
