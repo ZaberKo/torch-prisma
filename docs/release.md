@@ -2,7 +2,7 @@
 
 ## Local development
 
-See the repository's [development guide](https://github.com/ZaberKo/torch-prisma/blob/main/DEV.md) for environment setup, tests, and local builds.
+The README explains environment setup, tests, and local builds. [Development](https://github.com/ZaberKo/torch-prisma/blob/main/README.md#development)
 
 ## Read the Docs
 

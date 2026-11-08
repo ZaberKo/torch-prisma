@@ -1,31 +1,27 @@
 # Measurement API
 
-Import `measure_module_latency`, `calculate_model_complexity`, `count_parameters`, `LatencyStats`, and `ModelComplexity` from `torch_prisma`.
+Import `measure_module_latency`, `calculate_model_complexity`, `count_operations`, and `count_parameters` from `torch_prisma`.
 
 ## Inputs and execution
 
-Both measurement functions take `target`, `input_args`, an optional `device`, and optional `input_kwargs`. A tuple or list in `input_args` supplies positional arguments. Any other value supplies one positional argument. Use `()` for a keyword-only forward and `(items,)` to pass a list as one argument. Nested tuples, lists, and dictionaries can contain tensors.
+Set the model's train or eval mode and place the model and inputs on their execution devices before measuring. Both APIs run the supplied model or callable with the supplied inputs. Forward calls can change parameters, buffers, and inputs. Pass a separate model instance or input copies when you need to preserve the originals.
 
-The selected device defaults to the first registered parameter or buffer, then the first input tensor, then CPU. Place all registered parameters and buffers on that device before measuring. Measurement copies the module and inputs together, sets the copy to eval mode, and moves independent input tensors to the selected device. The copy preserves repeated input references and checks shared storage among dense, non-quantized tensors in the input containers and module dictionaries. Pass storage-sharing views on the selected device. Measurement raises an error if the backend cannot preserve their storage relationship during copying.
-
-Module measurement requires enough memory for a second copy of the module and inputs. Use a prepared callable when the target cannot be deep-copied or when the forward includes additional work. The callable owns its model placement, training mode, and captured state. Measurement copies the explicit inputs but leaves captured objects under the caller's control. Arrange aliases involving captured objects within the callable.
-
-Measurement restores the default CPU RNG and the default RNG of the selected accelerator on success or failure. Separate generators and state shared through hooks, closures, external services, or globals remain under the caller's control. Keep the source module and inputs stable while a measurement is in progress. Coordinate with other code that changes process-wide PyTorch backend settings, consumes default RNG state, or uses the profiler.
+A tuple or list in `input_args` supplies positional arguments. Any other value supplies one positional argument. Use `()` for a keyword-only forward and `(items,)` to pass a list as one argument. Use `input_kwargs` for keyword arguments.
 
 ## Latency
 
-`measure_module_latency(target, input_args, device=None, input_kwargs=None, *, repetitions=20, warmup=5, compile=False, compile_kwargs=None)` returns a `LatencyStats` dataclass.
+`measure_module_latency(target, input_args, device, input_kwargs=None, *, repetitions=20, warmup=5, compile=True, compile_kwargs=None)` returns a `LatencyStats` dataclass.
 
-Each sample is the duration of one forward for the supplied batch. CPU timing uses `time.perf_counter()`. CUDA and Ascend timing use device events on the current stream and synchronize the selected device around the measurement loop. Include any required stream dependencies in the callable.
+Each sample is the duration of one forward for the supplied batch. The required `device` selects the timing device. CPU timing uses `time.perf_counter()`. CUDA and Ascend timing use device events on the current stream and synchronize the selected device around the measurement loop. Include any required stream dependencies in the callable.
 
-Input preparation, event setup, and warmup occur outside the timed loop. With `compile=True`, the first compiled call also occurs outside that loop. Use a representative warmup and stable inputs to limit recompilation during sampling. `compile_kwargs` is forwarded to `torch.compile`. The default backend on Ascend is TorchAir. See [Ascend setup](ascend.md).
+Latency measurement uses `torch.compile` by default. Compilation preparation runs three untimed forwards with temporarily raised Dynamo recompilation limits. Warmup and sampling run afterward with the original limits. If either phase requires compilation, the measurement raises an error because the compiled latency would be unreliable. Use `compile=False` to measure eager latency. Preparation and warmup can change model and input state before sampling starts. `compile_kwargs` is forwarded to `torch.compile`. The default backend on Ascend is TorchAir. See [Ascend setup](ascend.md).
 
 | Field | Definition |
 | --- | --- |
 | `samples_ms` | Timings in measurement order |
 | `median_ms`, `mean_ms` | Median and arithmetic mean |
 | `std_ms` | Population standard deviation |
-| `p90_ms`, `p99_ms` | Percentiles with linear interpolation between ordered samples |
+| `p90_ms`, `p99_ms` | Samples at index `min(int(n * q), n - 1)` in sorted order for `q = 0.90` or `0.99` |
 | `min_ms`, `max_ms` | Minimum and maximum |
 
 All values use milliseconds. `LatencyStats.from_samples(samples_ms)` summarizes timings from any source under the same convention. `to_dict()` returns a JSON-ready representation.
@@ -34,7 +30,7 @@ When comparing two measurements, hold the batch size, shape, dtype, device, thre
 
 ## Complexity
 
-`calculate_model_complexity(target, input_args, device=None, input_kwargs=None, *, parameter_count=None)` returns a `ModelComplexity` dataclass for one eager forward. Run it separately from latency measurement. It disables gradients and the MHA fast path and requests math scaled dot-product attention during counting.
+`calculate_model_complexity(target, input_args, input_kwargs=None)` returns a `ModelComplexity` dataclass for one eager forward. Run it separately from latency measurement. It disables gradients and the MHA fast path and requests math scaled dot-product attention during counting.
 
 | Field | Definition |
 | --- | --- |
@@ -43,7 +39,7 @@ When comparing two measurements, hold the batch size, shape, dtype, device, thre
 | `flops` | Known nominal floating-point arithmetic on the executed path |
 | `uncovered_ops` | Sorted operator names with incomplete counts, grouped under `macs` and `flops` |
 
-`count_parameters(model)` reports the registered parameter count without a forward. It deduplicates by parameter identity and excludes buffers. Distinct parameters with shared storage count separately. Registered tensor dimensions determine the count for masked or zero-valued weights. For a plain callable, `params` defaults to zero. Supply `parameter_count` when the caller owns the active parameter count. `ModelComplexity.to_dict()` returns JSON-ready counts and coverage.
+`count_parameters(model)` reports the registered parameter count without a forward. It deduplicates by parameter identity and excludes buffers. Distinct parameters with shared storage count separately. Registered tensor dimensions determine the count for masked or zero-valued weights. For a plain callable, `params` defaults to zero. `ModelComplexity.to_dict()` returns JSON-ready counts and coverage.
 
 The counter attributes two nominal FLOPs to each real floating-point dense MAC. Supported bias, elementwise, reduction, and normalization arithmetic adds FLOPs independently. Comparisons, ReLU, forward max pooling, indexing, and data movement contribute zero FLOPs under this convention. Integer matrix work contributes logical MACs and zero FLOPs. Complex matrix work contributes logical MACs and a FLOP coverage gap. Masking and kernel fusion leave the declared dense MAC convention unchanged.
 
@@ -63,25 +59,14 @@ The following formulas cover common operations. Each transcendental operation co
 | Bias and scaling in a matrix product | An addition per output element when the bias term is active, plus each applicable nonunit scalar multiplication. |
 | Convolution with bias | One additional FLOP per output element. |
 
-### Sampled networks
+### Prepared forwards
 
-The caller selects the subnet and supplies its active parameter count. A callable can measure a prepared supernet without copying its cached sample state.
+`count_operations(forward)` runs a zero-argument eager callable and returns an `OperationCounts` dataclass with `macs`, `flops`, and `uncovered_ops`. Prepare the model and inputs before calling it. Code that measures a sampled network can use this function and compute its active parameter count separately.
 
 ```python
-from torch_prisma import calculate_model_complexity, measure_module_latency
+from torch_prisma import count_operations
 
-supernet.set_sample_config(config)
-supernet.eval()
-
-
-def forward(x):
-    return supernet(x)
-
-
-complexity = calculate_model_complexity(
-    forward, example_input, device=device, parameter_count=active_parameter_count
-)
-latency = measure_module_latency(forward, example_input, device=device)
+model.eval().to(device)
+inputs = inputs.to(device)
+operations = count_operations(lambda: model(inputs))
 ```
-
-Keep subnet selection, parameter accounting, and the capture of per-layer inputs in the caller.

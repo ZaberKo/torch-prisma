@@ -22,12 +22,12 @@ from torch import nn
 from torch_prisma import calculate_model_complexity, measure_module_latency
 
 device = torch.device("npu:0")
-model = nn.Linear(128, 64).to(device)
+model = nn.Linear(128, 64, device=device).eval()
 inputs = torch.randn(8, 128, device=device)
 
-eager = measure_module_latency(model, inputs, device, warmup=10, repetitions=30)
-compiled = measure_module_latency(model, inputs, device, warmup=10, repetitions=30, compile=True)
-complexity = calculate_model_complexity(model, inputs, device)
+eager = measure_module_latency(model, inputs, device, warmup=10, repetitions=30, compile=False)
+compiled = measure_module_latency(model, inputs, device, warmup=10, repetitions=30)
+complexity = calculate_model_complexity(model, inputs)
 
 print(eager.median_ms, compiled.median_ms)
 print(complexity.to_dict())
