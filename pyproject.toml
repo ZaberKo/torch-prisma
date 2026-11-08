@@ -1,0 +1,58 @@
+[build-system]
+requires = ["uv_build>=0.9.11,<0.10.0"]
+build-backend = "uv_build"
+
+[project]
+name = "torch-prisma"
+version = "0.1.0"
+description = "Measure PyTorch inference latency, MACs, FLOPs, and parameters"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = ["torch>=2.6"]
+keywords = ["pytorch", "latency", "benchmark", "flops", "macs", "model-complexity"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.urls]
+Repository = "https://github.com/ZaberKo/torch-prisma"
+Documentation = "https://github.com/ZaberKo/torch-prisma/blob/main/docs/index.md"
+Issues = "https://github.com/ZaberKo/torch-prisma/issues"
+
+[dependency-groups]
+dev = [
+    "pre-commit==4.7.0; python_version >= '3.11'",
+    "pytest>=8",
+    "ruff==0.17.4",
+]
+
+[tool.uv.build-backend]
+source-include = ["docs/**", "tests/**"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+markers = ["cuda: requires a CUDA runner", "ascend: requires an Ascend and TorchAir runner"]
+addopts = ["-ra", "--strict-config", "--strict-markers", "--import-mode=importlib"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF", "D"]
+ignore = ["E501"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+
+[tool.ruff.format]
+docstring-code-format = true

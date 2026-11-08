@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: "3.10"
+            torch: "2.6.0"
+          - python: "3.12"
+            torch: "2.15.0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.9.11"
+          enable-cache: true
+      - name: Install CPU test environment
+        env:
+          TEST_PYTHON: ${{ matrix.python }}
+          TEST_TORCH: ${{ matrix.torch }}
+        run: |
+          uv venv --python "$TEST_PYTHON"
+          uv pip install --torch-backend=cpu --group dev -e . "torch==$TEST_TORCH+cpu"
+      - name: Run pre-commit hooks
+        if: matrix.python == '3.12'
+        run: .venv/bin/pre-commit run --all-files --show-diff-on-failure
+      - name: Check and install distributions
+        if: matrix.python == '3.12'
+        run: |
+          uv lock --check
+          uv build
+          uvx --python 3.12 twine check --strict dist/*.whl dist/*.tar.gz
+          uv pip install --reinstall --no-deps dist/*.whl
+      - name: Test
+        run: .venv/bin/python -m pytest
+      - uses: actions/upload-artifact@v7
+        if: matrix.python == '3.12'
+        with:
+          name: python-package-distributions
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+          if-no-files-found: error
