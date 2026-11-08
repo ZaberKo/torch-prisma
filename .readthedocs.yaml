@@ -9,7 +9,7 @@ build:
       - python -m pip install uv
     build:
       html:
-        - uv run --locked --isolated --only-group docs --python "$(command -v python)" zensical build --strict
+        - python -m uv run --locked --isolated --only-group docs zensical build --strict
     post_build:
       - mkdir -p "$READTHEDOCS_OUTPUT/html"
       - cp -a site/. "$READTHEDOCS_OUTPUT/html/"
