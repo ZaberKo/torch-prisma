@@ -12,7 +12,7 @@ from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.profiler import ProfilerActivity, profile, record_function
 from torch.utils.flop_counter import FlopCounterMode, flop_registry
 
-from .execution import prepare_forward, tensor_leaves
+from .execution import call_arguments, tensor_leaves
 from .formulas import (
     FLOP_COMPOSITES,
     FLOP_FREE_OPS,
@@ -47,6 +47,15 @@ def count_parameters(model: nn.Module) -> int:
         Total number of parameter elements.
     """
     return sum(parameter.numel() for parameter in model.parameters())
+
+
+@dataclass(frozen=True)
+class OperationCounts:
+    """Dense MACs, nominal FLOPs, and coverage gaps for a forward."""
+
+    macs: int
+    flops: int
+    uncovered_ops: dict[str, tuple[str, ...]]
 
 
 @dataclass(frozen=True)
@@ -160,46 +169,42 @@ def _find_coverage_gaps(
 def calculate_model_complexity(
     target: Callable[..., Any],
     input_args: Any,
-    device: torch.device | str | None = None,
     input_kwargs: dict[str, Any] | None = None,
-    *,
-    parameter_count: int | None = None,
 ) -> ModelComplexity:
     """Count eager inference FLOPs, MACs and parameters for one forward.
 
+    Prepare the model mode and device placement before calling this function.
+    Changes made by the forward persist. Pass a separate model instance to
+    preserve the original model state.
+
     Args:
-        target: An eager module or a prepared callable. Modules are copied and
-            evaluated in eval mode. Callables manage their own captured state.
+        target: An eager module or a prepared callable.
         input_args: One positional input or a tuple/list of positional inputs.
-        device: CPU, CUDA or Ascend NPU, inferred from model tensors, then inputs.
         input_kwargs: Optional keyword arguments.
-        parameter_count: Override for registered parameters, for example the
-            active size of a sampled subnet. A plain callable defaults to zero.
 
     Returns:
         Counts for the supplied batch and executed path, with coverage gaps
-        listed in `uncovered_ops`. Counting uses math scaled dot-product
-        attention and temporarily disables the multihead attention fast path.
-
-    Raises:
-        TypeError: The target is not callable.
-        ValueError: The parameter override, input preparation, or a FLOP
-            formula result is invalid.
-        RuntimeError: The requested accelerator is unavailable.
+        listed in `uncovered_ops`. A plain callable has zero registered parameters.
     """
-    if not callable(target):
-        raise TypeError("target must be an nn.Module or callable")
-    if parameter_count is not None and (type(parameter_count) is not int or parameter_count < 0):
-        raise ValueError("parameter_count must be a nonnegative integer")
-    if parameter_count is None:
-        parameter_count = count_parameters(target) if isinstance(target, nn.Module) else 0
+    args, kwargs = call_arguments(input_args, input_kwargs)
+    params = count_parameters(target) if isinstance(target, nn.Module) else 0
+    operations = count_operations(lambda: target(*args, **kwargs))
+    return ModelComplexity(operations.macs, params, operations.flops, operations.uncovered_ops)
 
-    # Turning off inference mode can re-enable gradients under an outer no_grad.
-    with (
-        torch.inference_mode(False),
-        torch.no_grad(),
-        prepare_forward(target, input_args, input_kwargs, device) as (forward, args, kwargs, _),
-    ):
+
+def count_operations(forward: Callable[[], Any]) -> OperationCounts:
+    """Count the MACs and FLOPs of a prepared eager forward.
+
+    Args:
+        forward: A zero-argument callable that runs the desired forward pass.
+            The caller prepares the model and inputs and manages changes
+            made by the forward.
+
+    Returns:
+        MACs, FLOPs, and coverage gaps. Counting uses math scaled dot-product
+        attention and temporarily disables the multihead attention fast path.
+    """
+    with torch.inference_mode(False), torch.no_grad():
         # Preserve external non-MAC formulas. The mappings and validation
         # wrappers belong to this invocation, never the global registry.
         arithmetic = arithmetic_formulas()
@@ -292,7 +297,7 @@ def calculate_model_complexity(
             _counting_attention(),
             counter,
         ):
-            forward(*args, **kwargs)
+            forward()
         mac_free = (
             MAC_FREE_OPS
             | FLOP_FREE_OPS
@@ -300,9 +305,8 @@ def calculate_model_complexity(
         )
         uncovered_macs, flop_gaps = _find_coverage_gaps(trace.events(), mac_free)
         uncovered_flops.update(flop_gaps)
-        return ModelComplexity(
+        return OperationCounts(
             macs=macs,
-            params=parameter_count,
             flops=counter.get_total_flops(),
             uncovered_ops={
                 "macs": tuple(sorted(uncovered_macs)),
