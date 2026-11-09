@@ -175,7 +175,9 @@ def measure_module_latency(
             Ascend defaults to TorchAir. Set `False` for eager timing if
             TorchAir reports a compatibility error.
         compile_kwargs: Keyword arguments forwarded to `torch.compile` when
-            compilation is enabled.
+            compilation is enabled. On Ascend, pass `{"backend": "inductor"}`
+            to use Inductor with its default Triton compilation mode. If
+            `TORCHINDUCTOR_NPU_BACKEND` is set, it must be `default` for Triton.
 
     Returns:
         Forward durations in sampling order and their summary statistics in milliseconds.

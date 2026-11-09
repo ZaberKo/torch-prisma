@@ -122,3 +122,24 @@ def test_ascend_measurements():
     assert complexity.params == 15
     assert complexity.macs == 24 or complexity.uncovered_ops["macs"]
     assert complexity.flops == 54 or complexity.uncovered_ops["flops"]
+
+
+@pytest.mark.ascend
+@pytest.mark.skipif(
+    os.environ.get("TORCH_PRISMA_TEST_ASCEND_INDUCTOR") != "1",
+    reason="Requires Ascend with Triton Inductor",
+)
+def test_ascend_triton_inductor_measurement():
+    __import__("torch_npu")
+    device = torch.device("npu", torch.npu.current_device())
+    x = torch.randn(8192, device=device)
+
+    def forward(x):
+        return torch.sin(x) + x * x
+
+    stats = measure_module_latency(
+        forward, x, device, warmup=2, repetitions=3, compile_kwargs={"backend": "inductor"}
+    )
+    assert len(stats.samples_ms) == 3
+    assert stats.median_ms > 0
+    torch.testing.assert_close(torch.compile(forward, backend="inductor")(x), forward(x))

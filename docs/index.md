@@ -20,14 +20,17 @@ from torch import nn
 
 from torch_prisma import calculate_model_complexity, measure_module_latency
 
+# For inference, set the model to evaluation mode and place it and the inputs on the device.
 device = "cpu"
-model = nn.Linear(8, 4, device=device).eval()
+model = nn.Linear(8, 4).eval().to(device)
 inputs = torch.randn(2, 8, device=device)
 
 complexity = calculate_model_complexity(model, inputs)
 latency = measure_module_latency(model, inputs, device=device)
 
-print(complexity.to_dict())
+print(complexity.params, complexity.macs, complexity.flops)
+# Operations with incomplete counts, grouped by MACs and FLOPs.
+print(complexity.uncovered_ops)
 print(latency.median_ms)
 ```
 
@@ -35,5 +38,4 @@ print(latency.median_ms)
 
 - [Measurement API and conventions](measurement.md)
 - [Latency benchmarks](benchmarks.md)
-- [Huawei Ascend and TorchAir](ascend.md)
-- [Development and releases](release.md)
+- [Huawei Ascend](ascend.md)

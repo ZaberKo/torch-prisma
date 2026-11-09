@@ -7,7 +7,6 @@ nav = [
     { "Measurement API" = "measurement.md" },
     { "Latency benchmarks" = "benchmarks.md" },
     { "Huawei Ascend" = "ascend.md" },
-    { "Development and releases" = "release.md" },
 ]
 
 [project.theme]
