@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "torch-prisma"
-version = "0.1.1"
+version = "0.1.2"
 description = "Measure PyTorch inference latency, MACs, FLOPs, and parameters"
 readme = "README.md"
 license = "MIT"

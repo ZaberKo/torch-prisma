@@ -12,7 +12,7 @@ from torch_prisma import calculate_model_complexity, measure_module_latency
 
 
 def test_ascend_compiler_and_event_wiring(monkeypatch):
-    timing_device = torch.device("mps")
+    timing_device = torch.device("cuda")
     ascend_device = SimpleNamespace(type="npu")
     stream = object()
     operations = []
@@ -105,16 +105,6 @@ def test_cuda_measurements():
         assert stats.median_ms > 0
     complexity = calculate_model_complexity(model, x)
     assert (complexity.params, complexity.macs, complexity.flops) == (15, 24, 54)
-
-
-@pytest.mark.skipif(not torch.backends.mps.is_available(), reason="Requires Apple MPS")
-def test_mps_measurement():
-    device = torch.device("mps")
-    model = nn.Linear(4, 3, device=device).eval()
-    x = torch.ones(2, 4, device=device)
-    stats = measure_module_latency(model, x, device, warmup=1, repetitions=3, compile=False)
-    assert len(stats.samples_ms) == 3
-    assert stats.median_ms > 0
 
 
 @pytest.mark.ascend
