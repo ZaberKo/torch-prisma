@@ -1,6 +1,6 @@
 # Torch Prisma
 
-Torch Prisma measures PyTorch inference latency, parameters, multiply-accumulates (MACs), and floating-point operations (FLOPs) on CPU, CUDA, and Huawei Ascend.
+Torch Prisma measures PyTorch inference latency, parameters, multiply-accumulates (MACs), and floating-point operations (FLOPs) on CPUs and accelerators.
 
 ## Installation
 

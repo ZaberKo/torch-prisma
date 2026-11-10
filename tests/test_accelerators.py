@@ -12,7 +12,8 @@ from torch_prisma import calculate_model_complexity, measure_module_latency
 
 
 def test_ascend_compiler_and_event_wiring(monkeypatch):
-    device = SimpleNamespace(type="npu")
+    timing_device = torch.device("mps")
+    ascend_device = SimpleNamespace(type="npu")
     stream = object()
     operations = []
     forward_limits = []
@@ -22,8 +23,8 @@ def test_ascend_compiler_and_event_wiring(monkeypatch):
     original_limits = getattr(config, limit_name), getattr(config, accumulated_limit_name)
 
     class Event:
-        def __init__(self, *, enable_timing):
-            assert enable_timing
+        def __init__(self, *, device, enable_timing):
+            assert device == timing_device and enable_timing
 
         def record(self, selected_stream):
             assert selected_stream is stream
@@ -34,18 +35,12 @@ def test_ascend_compiler_and_event_wiring(monkeypatch):
             return 0.25
 
     def current_stream(selected):
-        assert selected is device
+        assert selected == timing_device
         return stream
 
     def synchronize(selected):
-        assert selected is device
+        assert selected == timing_device
         operations.append("sync")
-
-    runtime = SimpleNamespace(Event=Event, current_stream=current_stream, synchronize=synchronize)
-
-    def timing_device(requested):
-        assert requested == "npu:0"
-        return device, runtime
 
     def compile_fn(fn, *, backend, fullgraph):
         assert backend == "torchair-test" and fullgraph
@@ -60,21 +55,27 @@ def test_ascend_compiler_and_event_wiring(monkeypatch):
 
     backend_factory = Mock(return_value="torchair-test")
     monkeypatch.setitem(sys.modules, "torchair", SimpleNamespace(get_npu_backend=backend_factory))
-    monkeypatch.setattr(latency, "_timing_device", timing_device)
+    compile_options = latency._compile_options
+    monkeypatch.setattr(
+        latency, "_compile_options", lambda device, options: compile_options(ascend_device, options)
+    )
+    monkeypatch.setattr(torch, "Event", Event)
+    monkeypatch.setattr(torch.accelerator, "current_stream", current_stream)
+    monkeypatch.setattr(torch.accelerator, "synchronize", synchronize)
     monkeypatch.setattr(torch, "compile", compile_fn)
     latency._default_npu_backend.cache_clear()
     try:
-        assert latency._compile_options(device, {"backend": "custom"}) == {"backend": "custom"}
+        assert compile_options(ascend_device, {"backend": "custom"}) == {"backend": "custom"}
         backend_factory.assert_not_called()
         result = measure_module_latency(
             forward,
             torch.ones(1),
-            "npu:0",
+            timing_device,
             repetitions=2,
             warmup=1,
             compile_kwargs={"fullgraph": True},
         )
-        assert latency._compile_options(device, None) == {"backend": "torchair-test"}
+        assert compile_options(ascend_device, None) == {"backend": "torchair-test"}
         backend_factory.assert_called_once_with()
     finally:
         latency._default_npu_backend.cache_clear()
@@ -96,11 +97,24 @@ def test_cuda_measurements():
     device = torch.device("cuda", torch.cuda.current_device())
     model = nn.Linear(4, 3, device=device).eval()
     x = torch.ones(2, 4, device=device)
+    for timing_device in (device, "cuda"):
+        stats = measure_module_latency(
+            model, x, timing_device, warmup=1, repetitions=3, compile=False
+        )
+        assert len(stats.samples_ms) == 3
+        assert stats.median_ms > 0
+    complexity = calculate_model_complexity(model, x)
+    assert (complexity.params, complexity.macs, complexity.flops) == (15, 24, 54)
+
+
+@pytest.mark.skipif(not torch.backends.mps.is_available(), reason="Requires Apple MPS")
+def test_mps_measurement():
+    device = torch.device("mps")
+    model = nn.Linear(4, 3, device=device).eval()
+    x = torch.ones(2, 4, device=device)
     stats = measure_module_latency(model, x, device, warmup=1, repetitions=3, compile=False)
     assert len(stats.samples_ms) == 3
     assert stats.median_ms > 0
-    complexity = calculate_model_complexity(model, x)
-    assert (complexity.params, complexity.macs, complexity.flops) == (15, 24, 54)
 
 
 @pytest.mark.ascend
@@ -113,10 +127,13 @@ def test_ascend_measurements():
     device = torch.device("npu", torch.npu.current_device())
     model = nn.Linear(4, 3, device=device).eval()
     x = torch.ones(2, 4, device=device)
-    for compile in (False, True):
-        stats = measure_module_latency(model, x, device, warmup=2, repetitions=3, compile=compile)
-        assert len(stats.samples_ms) == 3
-        assert stats.median_ms > 0
+    for timing_device in (device, "npu"):
+        for compile in (False, True):
+            stats = measure_module_latency(
+                model, x, timing_device, warmup=2, repetitions=3, compile=compile
+            )
+            assert len(stats.samples_ms) == 3
+            assert stats.median_ms > 0
 
     complexity = calculate_model_complexity(model, x)
     assert complexity.params == 15

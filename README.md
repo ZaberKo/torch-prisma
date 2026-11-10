@@ -1,6 +1,6 @@
 # Torch Prisma
 
-Measure PyTorch inference latency, parameters, MACs, and FLOPs on CPU, CUDA, and Huawei Ascend.
+Measure PyTorch inference latency, parameters, MACs, and FLOPs on CPUs and accelerators.
 
 ## Installation
 

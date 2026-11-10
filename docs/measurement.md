@@ -4,13 +4,15 @@ Import the measurement functions from `torch_prisma`. Set the model's training o
 
 ## `measure_module_latency`
 
-Measures one forward per sample for the entire batch in inference mode. CPU uses a wall clock. CUDA and Ascend use events on the selected device's current stream.
+Measures one forward per sample for the entire batch in inference mode. CPU uses a wall clock. Accelerators use timed events on the selected device's current stream. The device type must match PyTorch's current accelerator type, and the backend must support timed events.
+
+NVIDIA CUDA and Huawei Ascend have been tested. PyTorch uses the `cuda` device type for AMD ROCm. Apple MPS provides timed events, but MPS and ROCm have not yet been tested with Torch Prisma.
 
 **Parameters**
 
 - `target` — Prepared module or callable.
 - `input_args` — Positional input or tuple/list of positional inputs. Use `(items,)` to pass a list as one argument.
-- `device` — Timing device.
+- `device` — Timing device as a `torch.device` or string. Place the model and inputs on this device before measuring.
 - `input_kwargs` — Optional keyword arguments.
 - `repetitions` — Number of timed forwards. Defaults to 20.
 - `warmup` — Number of untimed forwards after compilation preparation. Defaults to 5.
@@ -23,10 +25,10 @@ A `LatencyStats` result in milliseconds. Its `samples_ms` preserve sampling orde
 
 **Raises**
 
-- `ValueError` for invalid timing options or an unsupported timing device.
-- `RuntimeError` when the accelerator or default Ascend backend is unavailable, or compilation is required after preparation.
+- `ValueError` for invalid timing options or a device type that does not match the current accelerator.
+- `RuntimeError` when the accelerator or default Ascend backend is unavailable, the backend does not support timed events, or compilation is required after preparation.
 
-Compilation runs three untimed forwards before warmup. Set `compile=False` for eager timing. See [Ascend setup](ascend.md) and [latency benchmarks](benchmarks.md).
+Compilation runs three untimed forwards before warmup. If PyTorch requests compilation after preparation, measurement fails rather than including compilation in the result. Set `compile=False` for eager timing or when compilation is incompatible with the model or device. See [Ascend setup](ascend.md) and [latency benchmarks](benchmarks.md).
 
 ## `calculate_model_complexity`
 

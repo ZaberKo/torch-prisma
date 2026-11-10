@@ -1,6 +1,6 @@
 # Latency benchmarks
 
-These measurements examine variation across independent process starts. Each process calls `measure_module_latency()` once. Each supported combination has 16 results: eight on each of two physical cards. The two cards were tested concurrently, with case order shuffled. Results retain all timed samples, including outliers.
+These measurements examine variation across independent process starts. Each process calls `measure_module_latency()` once. Each supported combination has 16 results: eight on each of two physical cards. The two cards were tested concurrently, with case order shuffled. Results retain all timed samples, including outliers. These measurements used device-specific events, before the switch to PyTorch's generic event API.
 
 Each test uses one accelerator, one PyTorch intra-op thread, randomly initialized TorchVision weights, and a fixed FP32 input of shape `(1, 3, 224, 224)`. The model is in evaluation mode, and weights and input use a fixed seed. The warmup and sample counts are shown below. Compiled measurements also use three preparation forwards. Inductor's disk cache was reused between processes separately for each card.
 

@@ -1,4 +1,4 @@
-"""Eager and compiled inference latency on CPU, CUDA and Ascend."""
+"""Eager and compiled inference latency on CPU and accelerators."""
 
 import functools
 import gc
@@ -9,7 +9,6 @@ from collections.abc import Callable, Iterable, Iterator
 from contextlib import AbstractContextManager, ExitStack, contextmanager
 from dataclasses import asdict, dataclass, field
 from importlib import import_module
-from types import ModuleType
 from typing import Any
 
 import torch
@@ -78,21 +77,6 @@ class LatencyStats:
         result = asdict(self)
         result["samples_ms"] = list(self.samples_ms)
         return result
-
-
-def _timing_device(requested: torch.device | str) -> tuple[torch.device, ModuleType | None]:
-    """Resolve the device and runtime used to record timing events."""
-    if isinstance(requested, str) and requested.split(":", 1)[0] == "npu":
-        import_module("torch_npu")
-    device = torch.device(requested)
-    if device.type == "cpu":
-        return device, None
-    if device.type not in ("cuda", "npu"):
-        raise ValueError(f"Unsupported timing device {device}. Expected CPU, CUDA or Ascend NPU")
-    runtime = getattr(torch, device.type)
-    if device.index is None:
-        device = torch.device(device.type, runtime.current_device())
-    return device, runtime
 
 
 def _unlimited_recompile_patch() -> AbstractContextManager[None]:
@@ -167,7 +151,8 @@ def measure_module_latency(
     Args:
         target: A prepared module or callable.
         input_args: One positional input or a tuple/list of positional inputs.
-        device: Device used for timing. CUDA and Ascend use its current stream.
+        device: Device used for timing. Accelerators use the selected device's
+            current stream and must match PyTorch's current accelerator type.
         input_kwargs: Optional keyword arguments.
         repetitions: Positive number of timed forwards.
         warmup: Number of untimed forwards after any compilation preparation.
@@ -193,7 +178,9 @@ def measure_module_latency(
         raise ValueError("compile must be a boolean")
 
     args, kwargs = call_arguments(input_args, input_kwargs)
-    device, runtime = _timing_device(device)
+    if isinstance(device, str) and device.split(":", 1)[0] == "npu":
+        import_module("torch_npu")
+    device = torch.device(device)
     forward = target
     with torch.inference_mode(), ExitStack() as timing:
         if compile:
@@ -202,29 +189,32 @@ def measure_module_latency(
                 # A forward can initialize state and invalidate the first graph.
                 for _ in range(_COMPILE_ITERS):
                     forward(*args, **kwargs)
-                if runtime is not None:
-                    runtime.synchronize(device)
+                if device.type != "cpu":
+                    torch.accelerator.synchronize(device)
             timing.enter_context(_fail_on_late_compile())
         for _ in range(warmup):
             forward(*args, **kwargs)
 
         events = []
-        if runtime is not None:
-            stream = runtime.current_stream(device)
+        if device.type != "cpu":
+            stream = torch.accelerator.current_stream(device)
             events = [
-                (runtime.Event(enable_timing=True), runtime.Event(enable_timing=True))
+                (
+                    torch.Event(device=device, enable_timing=True),
+                    torch.Event(device=device, enable_timing=True),
+                )
                 for _ in range(repetitions)
             ]
             # Event handles may be allocated lazily by the first record.
             for start, end in events:
                 start.record(stream)
                 end.record(stream)
-            runtime.synchronize(device)
+            torch.accelerator.synchronize(device)
 
         gc_enabled = gc.isenabled()
         gc.disable()
         try:
-            if runtime is None:
+            if device.type == "cpu":
                 samples = []
                 for _ in range(repetitions):
                     start_time = time.perf_counter()
@@ -235,7 +225,7 @@ def measure_module_latency(
                     start.record(stream)
                     forward(*args, **kwargs)
                     end.record(stream)
-                runtime.synchronize(device)
+                torch.accelerator.synchronize(device)
                 samples = [start.elapsed_time(end) for start, end in events]
         finally:
             if gc_enabled:
