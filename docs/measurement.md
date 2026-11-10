@@ -6,8 +6,6 @@ Import the measurement functions from `torch_prisma`. Set the model's training o
 
 Measures one forward per sample for the entire batch in inference mode. Forward side effects are not managed. Pass deep copies of the model and inputs if needed. CPU uses a wall clock. Accelerators use timed events on the selected device's current stream. The device type must match PyTorch's current accelerator type, and the backend must support timed events.
 
-PyTorch uses the `cuda` device type for AMD ROCm.
-
 **Parameters**
 
 - `target` — Prepared module or callable.
