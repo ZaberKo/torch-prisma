@@ -1,10 +1,10 @@
 # Measurement API
 
-Import the measurement functions from `torch_prisma`. Set the model's training or evaluation mode and place the model and inputs on their execution devices before measuring. Forward side effects persist.
+Import the measurement functions from `torch_prisma`. Set the model's training or evaluation mode and place the model and inputs on their execution devices before measuring.
 
 ## `measure_module_latency`
 
-Measures one forward per sample for the entire batch in inference mode. CPU uses a wall clock. Accelerators use timed events on the selected device's current stream. The device type must match PyTorch's current accelerator type, and the backend must support timed events.
+Measures one forward per sample for the entire batch in inference mode. Forward side effects are not managed. Pass deep copies of the model and inputs if needed. CPU uses a wall clock. Accelerators use timed events on the selected device's current stream. The device type must match PyTorch's current accelerator type, and the backend must support timed events.
 
 NVIDIA CUDA and Huawei Ascend have been tested. PyTorch uses the `cuda` device type for AMD ROCm. Apple MPS provides timed events, but MPS and ROCm have not yet been tested with Torch Prisma.
 

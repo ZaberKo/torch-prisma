@@ -20,12 +20,13 @@ from torch import nn
 
 from torch_prisma import calculate_model_complexity, measure_module_latency
 
-# For inference, set the model to evaluation mode and place it and the inputs on the device.
+# Set evaluation mode and place the model and inputs on the device before measuring.
 device = "cpu"
 model = nn.Linear(8, 4).eval().to(device)
 inputs = torch.randn(2, 8, device=device)
 
 complexity = calculate_model_complexity(model, inputs)
+# Forward side effects are not managed. Pass deep copies of the model and inputs if needed.
 latency = measure_module_latency(model, inputs, device=device)
 
 print(complexity.params, complexity.macs, complexity.flops)
