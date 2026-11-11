@@ -1,5 +1,11 @@
 # Torch Prisma
 
+[![CI](https://github.com/ZaberKo/torch-prisma/actions/workflows/ci.yml/badge.svg)](https://github.com/ZaberKo/torch-prisma/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/torch-prisma)](https://pypi.org/project/torch-prisma/)
+[![Python](https://img.shields.io/pypi/pyversions/torch-prisma)](https://pypi.org/project/torch-prisma/)
+[![Documentation](https://readthedocs.org/projects/torch-prisma/badge/?version=latest)](https://torch-prisma.readthedocs.io/)
+[![License](https://img.shields.io/pypi/l/torch-prisma)](LICENSE)
+
 Measure PyTorch inference latency, parameters, MACs, and FLOPs on CPUs and accelerators.
 
 ## Installation
@@ -35,7 +41,7 @@ print(complexity.uncovered_ops)
 print(latency.median_ms)
 ```
 
-[Measurement API](https://github.com/ZaberKo/torch-prisma/blob/main/docs/measurement.md) · [Latency benchmarks](https://github.com/ZaberKo/torch-prisma/blob/main/docs/benchmarks.md) · [Huawei Ascend](https://github.com/ZaberKo/torch-prisma/blob/main/docs/ascend.md)
+Documentation: [torch-prisma.readthedocs.io](https://torch-prisma.readthedocs.io/).
 
 ## Development
 
